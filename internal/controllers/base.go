@@ -25,12 +25,11 @@ type BaseController struct {
 }
 
 // NewBaseController creates a new BaseController instance
-func NewBaseController(ctx context.Context, storage Storage, defaultEndTime func() string, log Log) *BaseController {
+func NewBaseController(ctx context.Context, storage Storage, log Log) *BaseController {
 	instance := &BaseController{
-		ctx:            ctx,
-		storage:        storage,
-		defaultEndTime: defaultEndTime,
-		log:            log,
+		ctx:     ctx,
+		storage: storage,
+		log:     log,
 	}
 
 	return instance

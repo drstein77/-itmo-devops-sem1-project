@@ -43,7 +43,7 @@ func (server *Server) Serve() {
 	}
 
 	// initialize the keeper instance
-	keeper := initializeKeeper(option.DataBaseDSN, nLogger, option.UserUpdateInterval)
+	keeper := initializeKeeper(option.DataBaseDSN, nLogger)
 	if keeper == nil {
 		nLogger.Debug("Failed to initialize keeper")
 	}
@@ -56,7 +56,7 @@ func (server *Server) Serve() {
 	}
 
 	// create a new controller to process incoming requests
-	basecontr := initializeBaseController(server.ctx, memoryStorage, option.DefaultEndTime, nLogger)
+	basecontr := initializeBaseController(server.ctx, memoryStorage, nLogger)
 
 	// get a middleware for logging requests
 	reqLog := middleware.NewReqLog(nLogger)
@@ -78,13 +78,13 @@ func (server *Server) Serve() {
 }
 
 // initializeKeeper initializes a BDKeeper instance
-func initializeKeeper(dataBaseDSN func() string, logger *logger.Logger, userUpdateInterval func() string) *bdkeeper.BDKeeper {
+func initializeKeeper(dataBaseDSN func() string, logger *logger.Logger) *bdkeeper.BDKeeper {
 	if dataBaseDSN() == "" {
 		logger.Warn("DataBaseDSN is empty")
 		return nil
 	}
 
-	return bdkeeper.NewBDKeeper(dataBaseDSN, logger, userUpdateInterval)
+	return bdkeeper.NewBDKeeper(dataBaseDSN, logger)
 }
 
 // initializeStorage initializes a MemoryStorage instance
@@ -98,10 +98,10 @@ func initializeStorage(ctx context.Context, keeper storage.Keeper, logger *logge
 }
 
 // initializeBaseController initializes a BaseController instance
-func initializeBaseController(ctx context.Context, storage *storage.MemoryStorage, DefaultEndTime func() string,
+func initializeBaseController(ctx context.Context, storage *storage.MemoryStorage,
 	logger *logger.Logger,
 ) *controllers.BaseController {
-	return controllers.NewBaseController(ctx, storage, DefaultEndTime, logger)
+	return controllers.NewBaseController(ctx, storage, logger)
 }
 
 // startServer configures and starts an HTTP server with the provided router and address

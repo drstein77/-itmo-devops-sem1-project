@@ -24,7 +24,7 @@ type BDKeeper struct {
 	userUpdateInterval func() string
 }
 
-func NewBDKeeper(dsn func() string, log Log, userUpdateInterval func() string) *BDKeeper {
+func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
 	addr := dsn()
 	if addr == "" {
 		log.Info("database dsn is empty")
@@ -88,9 +88,8 @@ func NewBDKeeper(dsn func() string, log Log, userUpdateInterval func() string) *
 	log.Info("Connected!")
 
 	return &BDKeeper{
-		pool:               pool,
-		log:                log,
-		userUpdateInterval: userUpdateInterval,
+		pool: pool,
+		log:  log,
 	}
 }
 
