@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/drstein77/priceanalyzer/internal/models"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/postgres"
 	"github.com/jackc/pgx/v5"
@@ -112,4 +113,58 @@ func (kp *BDKeeper) Ping(ctx context.Context) bool {
 	}
 
 	return true
+}
+
+func (kp *BDKeeper) InsertProducts(products []models.Product) error {
+	// Проверка подключения к базе
+	if kp.pool == nil {
+		return fmt.Errorf("database connection pool is nil")
+	}
+
+	// Начало транзакции
+	tx, err := kp.pool.Begin(context.Background())
+	if err != nil {
+		kp.log.Info("Failed to begin transaction", zap.Error(err))
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(context.Background())
+			kp.log.Info("Transaction rolled back due to an error")
+		}
+	}()
+
+	// Подготовка запроса
+	stmt := `
+		INSERT INTO prices (id, name, category, price, create_date)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (id) DO NOTHING
+	`
+	batch := &pgx.Batch{}
+
+	// Формирование пакета запросов
+	for _, product := range products {
+		batch.Queue(stmt, product.ID, product.Name, product.Category, product.Price, product.CreatedAt)
+	}
+
+	// Выполнение пакета
+	br := tx.SendBatch(context.Background(), batch)
+	defer br.Close()
+
+	// Проверка ошибок выполнения запросов
+	for i := 0; i < len(products); i++ {
+		if _, err := br.Exec(); err != nil {
+			kp.log.Info("Failed to execute batch query", zap.Error(err))
+			return fmt.Errorf("failed to execute batch query: %w", err)
+		}
+	}
+
+	// Коммит транзакции
+	if err := tx.Commit(context.Background()); err != nil {
+		kp.log.Info("Failed to commit transaction", zap.Error(err))
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	kp.log.Info("Products successfully inserted into the database")
+	return nil
 }
