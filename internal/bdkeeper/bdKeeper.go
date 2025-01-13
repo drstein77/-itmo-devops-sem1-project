@@ -168,3 +168,51 @@ func (kp *BDKeeper) InsertProducts(products []models.Product) error {
 	kp.log.Info("Products successfully inserted into the database")
 	return nil
 }
+
+func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error) {
+	// Проверка подключения к базе
+	if kp.pool == nil {
+		return nil, fmt.Errorf("database connection pool is nil")
+	}
+
+	// SQL-запрос для извлечения всех данных из таблицы
+	query := `
+		SELECT id, name, category, price, create_date
+		FROM prices
+	`
+
+	// Выполняем запрос
+	rows, err := kp.pool.Query(ctx, query)
+	if err != nil {
+		kp.log.Info("Failed to execute query", zap.Error(err))
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	defer rows.Close()
+
+	// Считываем данные
+	var products []models.Product
+	for rows.Next() {
+		var product models.Product
+		err := rows.Scan(
+			&product.ID,
+			&product.Name,
+			&product.Category,
+			&product.Price,
+			&product.CreatedAt,
+		)
+		if err != nil {
+			kp.log.Info("Failed to scan row", zap.Error(err))
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		products = append(products, product)
+	}
+
+	// Проверяем наличие ошибок при итерации
+	if rows.Err() != nil {
+		kp.log.Info("Error occurred during rows iteration", zap.Error(rows.Err()))
+		return nil, fmt.Errorf("error during rows iteration: %w", rows.Err())
+	}
+
+	kp.log.Info("Successfully retrieved all products", zap.Int("count", len(products)))
+	return products, nil
+}

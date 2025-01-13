@@ -34,6 +34,7 @@ type MemoryStorage struct {
 
 // Keeper interface for database operations
 type Keeper interface {
+	GetAllProducts(context.Context) ([]models.Product, error)
 	InsertProducts([]models.Product) error
 	Ping(context.Context) bool
 	Close() bool
@@ -57,6 +58,17 @@ func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorag
 		keeper: keeper,
 		log:    log,
 	}
+}
+
+// GetAllProducts извлекает все продукты через bdKeeper
+func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, error) {
+	// Вызываем метод GetAllProducts на уровне BDKeeper
+	products, err := s.keeper.GetAllProducts(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return products, nil
 }
 
 func (s *MemoryStorage) ProcessPrices(data io.Reader) (*models.ProcessResponse, error) {

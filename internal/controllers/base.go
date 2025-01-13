@@ -16,6 +16,7 @@ import (
 // Storage interface for database operations
 type Storage interface {
 	ProcessPrices(io.Reader) (*models.ProcessResponse, error)
+	GetAllProducts(context.Context) ([]models.Product, error)
 }
 
 // Log interface for logging
@@ -70,5 +71,17 @@ func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BaseController) getPrices(w http.ResponseWriter, r *http.Request) {
-	// ...
+	products, err := h.storage.GetAllProducts(h.ctx)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to retrieve prices: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Установка заголовка Content-Type
+	w.Header().Set("Content-Type", "application/json")
+
+	// Кодирование данных в JSON и отправка ответа
+	if err := json.NewEncoder(w).Encode(products); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
