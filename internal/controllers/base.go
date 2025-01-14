@@ -51,13 +51,12 @@ func (h *BaseController) Route() *chi.Mux {
 	r.With(middleware.ArchiveTypeMiddleware).Post("/api/v0/prices", h.postPrices)
 
 	// Применяем CompressMiddleware для GET запросов
-	r.With(middleware.CreateCompressMiddleware("zip")).Get("/api/v0/prices", h.getPrices)
+	r.With(middleware.CompressResponseMiddleware).Get("/api/v0/prices", h.getPrices)
 
 	return r
 }
 
 func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
-	// Передаём тело запроса (stream CSV) в storage
 	response, err := h.storage.ProcessPrices(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to process prices: %v", err), http.StatusInternalServerError)

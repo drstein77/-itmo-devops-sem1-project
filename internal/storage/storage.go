@@ -8,6 +8,7 @@ import (
 	"io"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/models"
 	"go.uber.org/zap"
@@ -110,12 +111,13 @@ func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
 		id, _ := strconv.Atoi(record[0])
 		price, _ := strconv.ParseFloat(record[3], 64)
 
+		createdAt, err := time.Parse(time.RFC3339, record[4])
 		products = append(products, models.Product{
 			ID:        id,
 			Name:      record[1],
 			Category:  record[2],
 			Price:     price,
-			CreatedAt: record[4],
+			CreatedAt: createdAt,
 		})
 	}
 	return products, nil

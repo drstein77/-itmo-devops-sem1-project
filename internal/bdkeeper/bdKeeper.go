@@ -7,8 +7,9 @@ import (
 	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/models"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/postgres"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file" // registers a migrate driver.
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -20,9 +21,8 @@ type Log interface {
 }
 
 type BDKeeper struct {
-	pool               *pgxpool.Pool
-	log                Log
-	userUpdateInterval func() string
+	pool *pgxpool.Pool
+	log  Log
 }
 
 func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
@@ -115,7 +115,7 @@ func (kp *BDKeeper) Ping(ctx context.Context) bool {
 	return true
 }
 
-func (kp *BDKeeper) InsertProducts(products []models.Product) error {
+func (kp *BDKeeper) InsertProducts(products []models.Product) (err error) {
 	// Проверка подключения к базе
 	if kp.pool == nil {
 		return fmt.Errorf("database connection pool is nil")
@@ -127,19 +127,26 @@ func (kp *BDKeeper) InsertProducts(products []models.Product) error {
 		kp.log.Info("Failed to begin transaction", zap.Error(err))
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+
+	// Используем deferred функцию для отката транзакции в случае ошибки
 	defer func() {
 		if err != nil {
-			_ = tx.Rollback(context.Background())
-			kp.log.Info("Transaction rolled back due to an error")
+			rollbackErr := tx.Rollback(context.Background())
+			if rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
+				// Логируем ошибку отката, но не переопределяем основную ошибку
+				fmt.Errorf("Failed to rollback transaction", zap.Error(rollbackErr))
+			} else {
+				kp.log.Info("Transaction rolled back due to an error")
+			}
 		}
 	}()
 
 	// Подготовка запроса
 	stmt := `
-		INSERT INTO prices (id, name, category, price, create_date)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (id) DO NOTHING
-	`
+        INSERT INTO prices (id, name, category, price, create_date)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO NOTHING
+    `
 	batch := &pgx.Batch{}
 
 	// Формирование пакета запросов
@@ -149,20 +156,26 @@ func (kp *BDKeeper) InsertProducts(products []models.Product) error {
 
 	// Выполнение пакета
 	br := tx.SendBatch(context.Background(), batch)
-	defer br.Close()
 
 	// Проверка ошибок выполнения запросов
 	for i := 0; i < len(products); i++ {
-		if _, err := br.Exec(); err != nil {
-			kp.log.Info("Failed to execute batch query", zap.Error(err))
-			return fmt.Errorf("failed to execute batch query: %w", err)
+		if _, execErr := br.Exec(); execErr != nil {
+			br.Close() // Закрываем батч перед возвратом ошибки
+			err = fmt.Errorf("failed to execute batch query: %w", execErr)
+			return err
 		}
 	}
 
+	// Закрываем батч после обработки всех запросов
+	if closeErr := br.Close(); closeErr != nil {
+		err = fmt.Errorf("failed to close batch results: %w", closeErr)
+		return err
+	}
+
 	// Коммит транзакции
-	if err := tx.Commit(context.Background()); err != nil {
-		kp.log.Info("Failed to commit transaction", zap.Error(err))
-		return fmt.Errorf("failed to commit transaction: %w", err)
+	if commitErr := tx.Commit(context.Background()); commitErr != nil {
+		err = fmt.Errorf("failed to commit transaction: %w", commitErr)
+		return err
 	}
 
 	kp.log.Info("Products successfully inserted into the database")

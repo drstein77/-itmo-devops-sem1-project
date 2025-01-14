@@ -3,84 +3,65 @@ package compress
 import (
 	"archive/tar"
 	"bytes"
+	"errors"
 	"io"
-	"net/http"
+	"strings"
 )
 
-// tarWriter implements the http.ResponseWriter interface
-// and allows it to transparently compress transmitted data in tar format.
-type tarWriter struct {
-	w   http.ResponseWriter
-	tar *tar.Writer
-	buf *bytes.Buffer
+// TarReader реализует io.ReadCloser для чтения содержимого CSV файла из TAR архива.
+type TarReader struct {
+	current io.Reader
+	tr      *tar.Reader
+	eof     bool
 }
 
-func NewTarWriter(w http.ResponseWriter) *tarWriter {
-	buf := &bytes.Buffer{}
-	return &tarWriter{
-		w:   w,
-		tar: tar.NewWriter(buf),
-		buf: buf,
-	}
-}
+// NewTarReader создает новый TarReader, извлекая первый найденный CSV файл из TAR архива.
+func NewTarReader(r io.ReadCloser) (*TarReader, error) {
+	defer r.Close()
 
-func (t *tarWriter) Header() http.Header {
-	return t.w.Header()
-}
-
-func (t *tarWriter) Write(p []byte) (int, error) {
-	hdr := &tar.Header{
-		Name: "data",
-		Size: int64(len(p)),
-	}
-	if err := t.tar.WriteHeader(hdr); err != nil {
-		return 0, err
-	}
-	return t.tar.Write(p)
-}
-
-func (t *tarWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 || statusCode == 409 {
-		t.w.Header().Set("Content-Encoding", "tar")
-	}
-	t.w.WriteHeader(statusCode)
-}
-
-func (t *tarWriter) Close() error {
-	if err := t.tar.Close(); err != nil {
-		return err
-	}
-	_, err := t.w.Write(t.buf.Bytes())
-	return err
-}
-
-// tarReader implements the io.ReadCloser interface and allows
-// to transparently decompress data in tar format.
-type tarReader struct {
-	r   io.ReadCloser
-	tar *tar.Reader
-}
-
-func NewTarReader(r io.ReadCloser) (*tarReader, error) {
+	// Читаем весь архив в буфер
 	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, r); err != nil {
 		return nil, err
 	}
 
-	return &tarReader{
-		r:   r,
-		tar: tar.NewReader(bytes.NewReader(buf.Bytes())),
-	}, nil
-}
+	// Создаем tar.Reader
+	tr := tar.NewReader(bytes.NewReader(buf.Bytes()))
 
-func (t *tarReader) Read(p []byte) (n int, err error) {
-	_, err = t.tar.Next()
-	if err != nil {
-		return 0, err
+	// Ищем первый CSV файл
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if header.Typeflag == tar.TypeReg && strings.HasSuffix(strings.ToLower(header.Name), ".csv") {
+			return &TarReader{
+				current: tr,
+				tr:      tr,
+				eof:     false,
+			}, nil
+		}
 	}
-	return t.tar.Read(p)
+
+	return nil, errors.New("CSV файл не найден в TAR архиве")
 }
 
-func (t *tarReader) Close() error {
-	return t.r.Close()
+// Read читает данные из текущего CSV файла.
+func (t *TarReader) Read(p []byte) (int, error) {
+	if t.eof {
+		return 0, io.EOF
+	}
+	n, err := t.current.Read(p)
+	if err == io.EOF {
+		t.eof = true
+	}
+	return n, err
+}
+
+// Close завершает чтение.
+func (t *TarReader) Close() error {
+	return nil // Нет дополнительных ресурсов для закрытия
 }

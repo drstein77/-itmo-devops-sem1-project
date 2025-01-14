@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type ProcessResponse struct {
 	TotalItems      int     `json:"total_items"`
 	TotalCategories int     `json:"total_categories"`
@@ -7,9 +9,9 @@ type ProcessResponse struct {
 }
 
 type Product struct {
-	ID        int
-	Name      string
-	Category  string
-	Price     float64
-	CreatedAt string
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Category  string    `json:"category"`
+	Price     float64   `json:"price"`
+	CreatedAt time.Time `json:"created_at"`
 }
