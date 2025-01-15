@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/models"
@@ -57,18 +58,18 @@ func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
 		return nil
 	}
 
-	dir, err := os.Getwd()
+	execPath, err := os.Executable()
 	if err != nil {
 		log.Info("Error getting current directory: ", zap.Error(err))
 	}
-
+	execDir := filepath.Dir(execPath)
 	// fix error test path
-	mp := dir + "/migrations"
+	mp := execDir + "/migrations"
 	var path string
 	if _, err := os.Stat(mp); err != nil {
 		path = "../../"
 	} else {
-		path = dir + "/"
+		path = execDir + "/"
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(

@@ -61,11 +61,12 @@ func getEnvOrDefault(key string, defaultValue string) string {
 // loadEnvFile loads environment variables from a .env file
 func loadEnvFile() {
 	// Determine the path to the .env file relative to the current working directory
-	cwd, err := os.Getwd()
+	execPath, err := os.Executable()
 	if err != nil {
 		log.Fatal(err)
 	}
-	envPath := filepath.Join(cwd, "..", "..", ".env")
+	execDir := filepath.Dir(execPath)
+	envPath := filepath.Join(execDir, "..", "..", ".env")
 
 	// Load environment variables from the .env file
 	err = godotenv.Load(envPath)
