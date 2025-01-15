@@ -3,14 +3,8 @@ services:
     image: postgres:16.0-alpine3.18
     container_name: postgres
     environment:
-      POSTGRES_DB: "gophstream"
-      POSTGRES_USER: "gophstream"
-      POSTGRES_PASSWORD: "example"
+      POSTGRES_DB: "project-sem-1"
+      POSTGRES_USER: "validator"
+      POSTGRES_PASSWORD: "val1dat0r"
     ports:
       - "5432:5432"
-    networks:
-      - priceanalyzer_network
- 
-networks:
-  priceanalyzer_network:
-    driver: bridge

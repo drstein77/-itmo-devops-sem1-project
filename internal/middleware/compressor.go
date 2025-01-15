@@ -85,13 +85,6 @@ func CreateCompressMiddleware(archiveType string) func(http.Handler) http.Handle
 // CompressResponseMiddleware создает middleware для упаковки ответов в ZIP архив.
 func CompressResponseMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Получаем параметр archiveType из query строки
-		archiveType := r.URL.Query().Get("archiveType")
-		if archiveType != "zip" {
-			// Если не указано, не упаковываем ответ
-			next.ServeHTTP(w, r)
-			return
-		}
 
 		// Создаем буфер для захвата ответа
 		var buf bytes.Buffer

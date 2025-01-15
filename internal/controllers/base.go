@@ -47,11 +47,15 @@ func NewBaseController(ctx context.Context, storage Storage, log Log) *BaseContr
 func (h *BaseController) Route() *chi.Mux {
 	r := chi.NewRouter()
 
-	// Применяем ArchiveTypeMiddleware только для POST запросов
-	r.With(middleware.ArchiveTypeMiddleware).Post("/api/v0/prices", h.postPrices)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.ArchiveTypeMiddleware)
+		r.Post("/api/v0/prices", h.postPrices)
+	})
 
-	// Применяем CompressMiddleware для GET запросов
-	r.With(middleware.CompressResponseMiddleware).Get("/api/v0/prices", h.getPrices)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.CompressResponseMiddleware)
+		r.Get("/api/v0/prices", h.getPrices)
+	})
 
 	return r
 }
