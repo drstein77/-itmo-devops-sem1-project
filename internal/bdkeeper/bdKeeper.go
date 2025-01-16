@@ -58,26 +58,18 @@ func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
 		return nil
 	}
 
-	execPath, err := os.Executable()
+	migrationsDir, err := findMigrationsDir()
 	if err != nil {
-		log.Info("Error getting current directory: ", zap.Error(err))
-	}
-	execDir := filepath.Dir(execPath)
-	// fix error test path
-	mp := execDir + "/migrations"
-	var path string
-	if _, err := os.Stat(mp); err != nil {
-		path = "../../"
-	} else {
-		path = execDir + "/"
+		log.Info("Ошибка поиска папки 'migrations': ", zap.Error(err))
+		return nil
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%smigrations", path),
+		fmt.Sprintf("file://%s", migrationsDir),
 		"postgres",
 		driver)
 	if err != nil {
-		log.Info("Error creating migration instance: ", zap.Error(err))
+		log.Info("Ошибка создания экземпляра миграции: ", zap.Error(err))
 		return nil
 	}
 
@@ -229,4 +221,27 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 
 	kp.log.Info("Successfully retrieved all products", zap.Int("count", len(products)))
 	return products, nil
+}
+
+func findMigrationsDir() (string, error) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("ошибка получения текущего каталога: %w", err)
+	}
+
+	for {
+		migrationsPath := filepath.Join(currentDir, "migrations")
+		info, err := os.Stat(migrationsPath)
+		if err == nil && info.IsDir() {
+			return migrationsPath, nil
+		}
+
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			break // Достигли корневого каталога
+		}
+		currentDir = parentDir
+	}
+
+	return "", fmt.Errorf("папка 'migrations' не найдена")
 }

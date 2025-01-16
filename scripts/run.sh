@@ -4,21 +4,19 @@ set -e
 
 echo "=== Запуск приложения ==="
 
-# Загрузка переменных окружения из .env файла, если он существует
-if [ -f $(dirname "$0")/../.env ]; then
-    export $(grep -v '^#' $(dirname "$0")/../.env | xargs)
-    echo "Переменные окружения загружены из .env файла."
-else
-    echo "Warning: .env файл не найден. Приложение будет запущено без него."
-fi
+# Загрузка переменных окружения вручную
+export RUN_ADDRESS=:8080
+export LOG_LEVEL=debug
+export DATABASE_URI=postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable
+echo "Переменные окружения загружены."
 
 # Компиляция приложения
 echo "Компиляция Go-приложения..."
-go build -o ../cmd/priceanalyzer/app ../cmd/priceanalyzer/
+go build -o app ../cmd/priceanalyzer/
 
 # Запуск приложения в фоновом режиме
 echo "Запуск приложения..."
-../cmd/priceanalyzer/app &
+./app &
 
 # Сохранение PID приложения, чтобы можно было его завершить позже
 APP_PID=$!
@@ -39,6 +37,7 @@ for i in {1..30}; do
         kill $APP_PID
         exit 1
     fi
+
 done
 
 # Сохранение PID в файл для использования в других шагах, если необходимо
