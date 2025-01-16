@@ -10,9 +10,13 @@ export LOG_LEVEL=debug
 export DATABASE_URI=postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable
 echo "Переменные окружения загружены."
 
+# Установка зависимостей Go
+echo "Установка зависимостей Go..."
+go mod tidy
+
 # Компиляция приложения
 echo "Компиляция Go-приложения..."
-go build -o app ../cmd/priceanalyzer/
+go build -o app cmd/priceanalyzer/main.go
 
 # Запуск приложения в фоновом режиме
 echo "Запуск приложения..."
