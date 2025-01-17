@@ -13,8 +13,8 @@ if ! command -v migrate &> /dev/null; then
 fi
 
 # Запуск миграции
-echo "Запуск миграции..."
-migrate -path=migrations -database "postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable" up
+echo "Запуск миграции..." 
+migrate -path=migrations -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" up
 
 # Компиляция приложения
 echo "Компиляция Go-приложения..."

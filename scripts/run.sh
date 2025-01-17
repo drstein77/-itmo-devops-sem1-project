@@ -6,8 +6,9 @@ echo "=== Запуск приложения ==="
 
 # Загрузка переменных окружения 
 export RUN_ADDRESS=:8080
-export LOG_LEVEL=debug
-export DATABASE_URI=postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable
+export LOG_LEVEL=debug 
+export DATABASE_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+
 echo "Переменные окружения загружены."
 
 # Запуск приложения в фоновом режиме
