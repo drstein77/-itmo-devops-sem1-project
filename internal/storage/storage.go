@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -60,12 +61,14 @@ func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorag
 
 // GetAllProducts retrieves all products via dbKeeper.
 func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, error) {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
 	// Call the GetAllProducts method at the DBKeeper level
 	products, err := s.keeper.GetAllProducts(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	return products, nil
 }
 
@@ -75,6 +78,9 @@ func (s *MemoryStorage) ProcessPrices(ctx context.Context, data io.Reader) (*mod
 	if err != nil {
 		return nil, err
 	}
+
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
 	// Save data to the database
 	if err := s.keeper.InsertProducts(ctx, products); err != nil {
@@ -104,11 +110,29 @@ func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
 			return nil, errors.New("failed to read CSV")
 		}
 
-		// Convert the string to a structure
-		id, _ := strconv.Atoi(record[0])
-		price, _ := strconv.ParseFloat(record[3], 64)
+		// Check if record has the expected number of fields
+		if len(record) != 5 {
+			return nil, fmt.Errorf("unexpected number of fields in record: %v", record)
+		}
 
-		createdAt, err := time.Parse(time.RFC3339, record[4])
+		// Parse ID
+		id, parseErr := strconv.Atoi(record[0])
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid ID format: %v", parseErr)
+		}
+
+		// Parse Price
+		price, parseErr := strconv.ParseFloat(record[3], 64)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid price format: %v", parseErr)
+		}
+
+		// Parse CreatedAt
+		createdAt, dateErr := time.Parse("2006-01-02", record[4])
+		if dateErr != nil {
+			return nil, fmt.Errorf("invalid date format: %v", dateErr)
+		}
+
 		products = append(products, models.Product{
 			ID:        id,
 			Name:      record[1],

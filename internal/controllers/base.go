@@ -26,10 +26,9 @@ type Log interface {
 
 // BaseController struct for handling requests
 type BaseController struct {
-	ctx            context.Context
-	storage        Storage
-	defaultEndTime func() string
-	log            Log
+	ctx     context.Context
+	storage Storage
+	log     Log
 }
 
 // NewBaseController creates a new BaseController instance
@@ -61,7 +60,7 @@ func (h *BaseController) Route() *chi.Mux {
 }
 
 func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
-	response, err := h.storage.ProcessPrices(h.ctx, r.Body)
+	response, err := h.storage.ProcessPrices(r.Context(), r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to process prices: %v", err), http.StatusInternalServerError)
 		return
@@ -70,11 +69,13 @@ func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
 
 	// Return the result to the client
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func (h *BaseController) getPrices(w http.ResponseWriter, r *http.Request) {
-	products, err := h.storage.GetAllProducts(h.ctx)
+	products, err := h.storage.GetAllProducts(r.Context())
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to retrieve prices: %v", err), http.StatusInternalServerError)
 		return

@@ -30,7 +30,8 @@ func CreateCompressMiddleware(archiveType string) func(http.Handler) http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Check Content-Type
-			if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
+			contentType := r.Header.Get("Content-Type")
+			if !strings.HasPrefix(contentType, "multipart/form-data") {
 				http.Error(w, "Content-Type must be multipart/form-data", http.StatusBadRequest)
 				return
 			}
