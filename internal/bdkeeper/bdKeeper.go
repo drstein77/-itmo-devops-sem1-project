@@ -3,17 +3,11 @@ package bdkeeper
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/models"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file" // registers a migrate driver.
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 )
 
@@ -42,40 +36,6 @@ func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		log.Info("Unable to connect to database: ", zap.Error(err))
-		return nil
-	}
-
-	connConfig, err := pgx.ParseConfig(addr)
-	if err != nil {
-		log.Info("Unable to parse connection string: %v\n")
-	}
-	// Register the driver with the name pgx
-	sqlDB := stdlib.OpenDB(*connConfig)
-
-	driver, err := postgres.WithInstance(sqlDB, &postgres.Config{})
-	if err != nil {
-		log.Info("Error getting driver: ", zap.Error(err))
-		return nil
-	}
-
-	migrationsDir, err := findMigrationsDir()
-	if err != nil {
-		log.Info("Ошибка поиска папки 'migrations': ", zap.Error(err))
-		return nil
-	}
-
-	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsDir),
-		"postgres",
-		driver)
-	if err != nil {
-		log.Info("Ошибка создания экземпляра миграции: ", zap.Error(err))
-		return nil
-	}
-
-	err = m.Up()
-	if err != nil && err != migrate.ErrNoChange {
-		log.Info("Error while performing migration: ", zap.Error(err))
 		return nil
 	}
 
@@ -221,27 +181,4 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 
 	kp.log.Info("Successfully retrieved all products", zap.Int("count", len(products)))
 	return products, nil
-}
-
-func findMigrationsDir() (string, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("ошибка получения текущего каталога: %w", err)
-	}
-
-	for {
-		migrationsPath := filepath.Join(currentDir, "migrations")
-		info, err := os.Stat(migrationsPath)
-		if err == nil && info.IsDir() {
-			return migrationsPath, nil
-		}
-
-		parentDir := filepath.Dir(currentDir)
-		if parentDir == currentDir {
-			break // Достигли корневого каталога
-		}
-		currentDir = parentDir
-	}
-
-	return "", fmt.Errorf("папка 'migrations' не найдена")
 }
