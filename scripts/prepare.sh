@@ -15,3 +15,7 @@ fi
 # Запуск миграции
 echo "Запуск миграции..."
 migrate -path=migrations -database "postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable" up
+
+# Компиляция приложения
+echo "Компиляция Go-приложения..."
+go build -o app cmd/priceanalyzer/main.go
