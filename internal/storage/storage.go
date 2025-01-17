@@ -58,9 +58,9 @@ func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorag
 	}
 }
 
-// GetAllProducts retrieves all products via bdKeeper.
+// GetAllProducts retrieves all products via dbKeeper.
 func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	// Call the GetAllProducts method at the BDKeeper level
+	// Call the GetAllProducts method at the DBKeeper level
 	products, err := s.keeper.GetAllProducts(ctx)
 	if err != nil {
 		return nil, err

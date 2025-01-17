@@ -1,4 +1,4 @@
-package bdkeeper
+package dbkeeper
 
 import (
 	"context"
@@ -16,12 +16,12 @@ type Log interface {
 	Error(string, ...zap.Field)
 }
 
-type BDKeeper struct {
+type DBKeeper struct {
 	pool *pgxpool.Pool
 	log  Log
 }
 
-func NewBDKeeper(ctx context.Context, dsn func() string, log Log) *BDKeeper {
+func NewDBKeeper(ctx context.Context, dsn func() string, log Log) *DBKeeper {
 	addr := dsn()
 	if addr == "" {
 		log.Error("database dsn is empty")
@@ -42,13 +42,13 @@ func NewBDKeeper(ctx context.Context, dsn func() string, log Log) *BDKeeper {
 
 	log.Info("Connected!")
 
-	return &BDKeeper{
+	return &DBKeeper{
 		pool: pool,
 		log:  log,
 	}
 }
 
-func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Product) (err error) {
+func (kp *DBKeeper) InsertProducts(ctx context.Context, products []models.Product) (err error) {
 	// Checking database connection
 	if kp.pool == nil {
 		return fmt.Errorf("database connection pool is nil")
@@ -115,7 +115,7 @@ func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Produc
 	return nil
 }
 
-func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error) {
+func (kp *DBKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error) {
 	// Checking database connection
 	if kp.pool == nil {
 		return nil, fmt.Errorf("database connection pool is nil")
@@ -163,7 +163,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 	return products, nil
 }
 
-func (kp *BDKeeper) Ping(ctx context.Context) bool {
+func (kp *DBKeeper) Ping(ctx context.Context) bool {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
 	defer cancel()
 
@@ -174,7 +174,7 @@ func (kp *BDKeeper) Ping(ctx context.Context) bool {
 	return true
 }
 
-func (kp *BDKeeper) Close() bool {
+func (kp *DBKeeper) Close() bool {
 	if kp.pool != nil {
 		kp.pool.Close()
 		kp.log.Info("Database connection pool closed")

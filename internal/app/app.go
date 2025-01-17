@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/drstein77/priceanalyzer/internal/bdkeeper"
 	"github.com/drstein77/priceanalyzer/internal/config"
 	"github.com/drstein77/priceanalyzer/internal/controllers"
+	"github.com/drstein77/priceanalyzer/internal/dbkeeper"
 	"github.com/drstein77/priceanalyzer/internal/logger"
 	"github.com/drstein77/priceanalyzer/internal/middleware"
 	"github.com/drstein77/priceanalyzer/internal/storage"
@@ -73,9 +73,9 @@ func (server *Server) Serve() {
 	}
 }
 
-// initializeKeeper initializes a BDKeeper instance
-func initializeKeeper(ctx context.Context, dataBaseDSN func() string, logger *logger.Logger) *bdkeeper.BDKeeper {
-	return bdkeeper.NewBDKeeper(ctx, dataBaseDSN, logger)
+// initializeKeeper initializes a DBKeeper instance
+func initializeKeeper(ctx context.Context, dataBaseDSN func() string, logger *logger.Logger) *dbkeeper.DBKeeper {
+	return dbkeeper.NewDBKeeper(ctx, dataBaseDSN, logger)
 }
 
 // initializeStorage initializes a MemoryStorage instance
