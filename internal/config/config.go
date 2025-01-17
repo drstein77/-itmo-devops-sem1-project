@@ -10,7 +10,9 @@ import (
 )
 
 type Options struct {
-	flagRunAddr, flagLogLevel, flagDataBaseDSN string
+	runAddr     string
+	logLevel    string
+	dataBaseDSN string
 }
 
 func NewOptions() *Options {
@@ -24,30 +26,28 @@ func (o *Options) ParseFlags() {
 	loadEnvFile()
 
 	// Override variable values with values from command line flags
-	regStringVar(&o.flagRunAddr, "a", getEnvOrDefault("RUN_ADDRESS", ":8080"), "address and port to run server")
-	regStringVar(&o.flagDataBaseDSN, "d", getEnvOrDefault("DATABASE_URI", ""), "")
-	regStringVar(&o.flagLogLevel, "l", getEnvOrDefault("LOG_LEVEL", "debug"), "log level")
+	regStringVar(&o.runAddr, "a", getEnvOrDefault("RUN_ADDRESS", ":8080"), "address and port to run server")
+	regStringVar(&o.logLevel, "l", getEnvOrDefault("LOG_LEVEL", "debug"), "log level")
+	regStringVar(&o.dataBaseDSN, "d", getEnvOrDefault("DATABASE_URI", ""), "database connection string")
 
 	// parse the arguments passed to the server into registered variables
 	flag.Parse()
 }
 
 func (o *Options) RunAddr() string {
-	return o.flagRunAddr
+	return o.runAddr
 }
 
 func (o *Options) LogLevel() string {
-	return o.flagLogLevel
+	return o.logLevel
 }
 
 func (o *Options) DataBaseDSN() string {
-	return o.flagDataBaseDSN
+	return o.dataBaseDSN
 }
 
 func regStringVar(p *string, name string, value string, usage string) {
-	if flag.Lookup(name) == nil {
-		flag.StringVar(p, name, value, usage)
-	}
+	flag.StringVar(p, name, value, usage)
 }
 
 // getEnvOrDefault reads an environment variable or returns a default value if the variable is not set or is empty.

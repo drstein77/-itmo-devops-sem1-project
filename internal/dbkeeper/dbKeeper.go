@@ -164,10 +164,11 @@ func (kp *DBKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 }
 
 func (kp *DBKeeper) Ping(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	if err := kp.pool.Ping(ctx); err != nil {
+		kp.log.Error("Database ping failed", zap.Error(err))
 		return false
 	}
 
