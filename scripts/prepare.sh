@@ -1,5 +1,10 @@
 # Завершаем скрипт при любой ошибке
 set -e
+PG_USER=validator
+PG_PASS=val1dat0r
+PG_HOST=localhost
+PG_PORT=5432
+PG_DB=project-sem-1
 
 # Установка зависимостей Go
 echo "Установка зависимостей Go..."
@@ -14,7 +19,7 @@ fi
 
 # Запуск миграции
 echo "Запуск миграции..." 
-migrate -path=migrations -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" up
+migrate -path=migrations -database "postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable" up
 
 # Компиляция приложения
 echo "Компиляция Go-приложения..."

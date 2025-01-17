@@ -2,12 +2,18 @@
 
 set -e
 
+PG_USER=validator
+PG_PASS=val1dat0r
+PG_HOST=localhost
+PG_PORT=5432
+PG_DB=project-sem-1
+
 echo "=== Запуск приложения ==="
 
 # Загрузка переменных окружения 
 export RUN_ADDRESS=:8080
 export LOG_LEVEL=debug 
-export DATABASE_URI=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable
+export DATABASE_URI=postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable
 
 echo "Переменные окружения загружены."
 
