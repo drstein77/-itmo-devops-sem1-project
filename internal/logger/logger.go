@@ -29,16 +29,24 @@ func NewLogger(level string) (*Logger, error) {
 	return &Logger{zap: logger}, err
 }
 
+// Debug logs a message at the debug level with optional fields.
 func (l Logger) Debug(msg string, fields ...zap.Field) {
 	l.writer().Debug(msg, fields...)
 }
 
+// Info logs a message at the info level with optional fields.
 func (l Logger) Info(msg string, fields ...zap.Field) {
 	l.writer().Info(msg, fields...)
 }
 
+// Warn logs a message at the warn level with optional fields.
 func (l Logger) Warn(msg string, fields ...zapcore.Field) {
 	l.writer().Warn(msg, fields...)
+}
+
+// Error logs a message at the error level with optional fields.
+func (l Logger) Error(msg string, fields ...zap.Field) {
+	l.writer().Error(msg, fields...)
 }
 
 func (l Logger) writer() *zap.Logger {

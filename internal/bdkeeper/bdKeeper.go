@@ -13,6 +13,7 @@ import (
 
 type Log interface {
 	Info(string, ...zap.Field)
+	Error(string, ...zap.Field)
 }
 
 type BDKeeper struct {
@@ -20,22 +21,22 @@ type BDKeeper struct {
 	log  Log
 }
 
-func NewBDKeeper(dsn func() string, log Log) *BDKeeper {
+func NewBDKeeper(ctx context.Context, dsn func() string, log Log) *BDKeeper {
 	addr := dsn()
 	if addr == "" {
-		log.Info("database dsn is empty")
+		log.Error("database dsn is empty")
 		return nil
 	}
 
 	config, err := pgxpool.ParseConfig(addr)
 	if err != nil {
-		log.Info("Unable to parse database DSN: ", zap.Error(err))
+		log.Error("Unable to parse database DSN: ", zap.Error(err))
 		return nil
 	}
 
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		log.Info("Unable to connect to database: ", zap.Error(err))
+		log.Error("Unable to connect to database: ", zap.Error(err))
 		return nil
 	}
 
@@ -68,26 +69,26 @@ func (kp *BDKeeper) Ping(ctx context.Context) bool {
 	return true
 }
 
-func (kp *BDKeeper) InsertProducts(products []models.Product) (err error) {
+func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Product) (err error) {
 	// Проверка подключения к базе
 	if kp.pool == nil {
 		return fmt.Errorf("database connection pool is nil")
 	}
 
 	// Начало транзакции
-	tx, err := kp.pool.Begin(context.Background())
+	tx, err := kp.pool.Begin(ctx)
 	if err != nil {
-		kp.log.Info("Failed to begin transaction", zap.Error(err))
+		kp.log.Error("Failed to begin transaction", zap.Error(err))
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
 	// Используем deferred функцию для отката транзакции в случае ошибки
 	defer func() {
 		if err != nil {
-			rollbackErr := tx.Rollback(context.Background())
+			rollbackErr := tx.Rollback(ctx)
 			if rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
 				// Логируем ошибку отката, но не переопределяем основную ошибку
-				fmt.Errorf("Failed to rollback transaction", zap.Error(rollbackErr))
+				kp.log.Error("Failed to rollback transaction", zap.Error(rollbackErr))
 			} else {
 				kp.log.Info("Transaction rolled back due to an error")
 			}
@@ -108,7 +109,7 @@ func (kp *BDKeeper) InsertProducts(products []models.Product) (err error) {
 	}
 
 	// Выполнение пакета
-	br := tx.SendBatch(context.Background(), batch)
+	br := tx.SendBatch(ctx, batch)
 
 	// Проверка ошибок выполнения запросов
 	for i := 0; i < len(products); i++ {
@@ -126,7 +127,7 @@ func (kp *BDKeeper) InsertProducts(products []models.Product) (err error) {
 	}
 
 	// Коммит транзакции
-	if commitErr := tx.Commit(context.Background()); commitErr != nil {
+	if commitErr := tx.Commit(ctx); commitErr != nil {
 		err = fmt.Errorf("failed to commit transaction: %w", commitErr)
 		return err
 	}
@@ -150,7 +151,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 	// Выполняем запрос
 	rows, err := kp.pool.Query(ctx, query)
 	if err != nil {
-		kp.log.Info("Failed to execute query", zap.Error(err))
+		kp.log.Error("Failed to execute query", zap.Error(err))
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	defer rows.Close()
@@ -167,7 +168,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 			&product.CreatedAt,
 		)
 		if err != nil {
-			kp.log.Info("Failed to scan row", zap.Error(err))
+			kp.log.Error("Failed to scan row", zap.Error(err))
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
 		products = append(products, product)
@@ -175,7 +176,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 
 	// Проверяем наличие ошибок при итерации
 	if rows.Err() != nil {
-		kp.log.Info("Error occurred during rows iteration", zap.Error(rows.Err()))
+		kp.log.Error("Error occurred during rows iteration", zap.Error(rows.Err()))
 		return nil, fmt.Errorf("error during rows iteration: %w", rows.Err())
 	}
 

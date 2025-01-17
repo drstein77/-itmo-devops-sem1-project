@@ -36,23 +36,13 @@ type MemoryStorage struct {
 // Keeper interface for database operations
 type Keeper interface {
 	GetAllProducts(context.Context) ([]models.Product, error)
-	InsertProducts([]models.Product) error
+	InsertProducts(context.Context, []models.Product) error
 	Ping(context.Context) bool
 	Close() bool
 }
 
 // NewMemoryStorage creates a new MemoryStorage instance
 func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorage {
-
-	if keeper != nil {
-		var err error
-		// Load messages
-
-		if err != nil {
-			log.Info("cannot load user data: ", zap.Error(err))
-		}
-	}
-
 	return &MemoryStorage{
 		ctx: ctx,
 
@@ -72,7 +62,7 @@ func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, e
 	return products, nil
 }
 
-func (s *MemoryStorage) ProcessPrices(data io.Reader) (*models.ProcessResponse, error) {
+func (s *MemoryStorage) ProcessPrices(ctx context.Context, data io.Reader) (*models.ProcessResponse, error) {
 	// Чтение CSV-данных
 	products, err := s.parseCSV(data)
 	if err != nil {
@@ -80,7 +70,7 @@ func (s *MemoryStorage) ProcessPrices(data io.Reader) (*models.ProcessResponse, 
 	}
 
 	// Сохранение данных в базе
-	if err := s.keeper.InsertProducts(products); err != nil {
+	if err := s.keeper.InsertProducts(ctx, products); err != nil {
 		return nil, err
 	}
 

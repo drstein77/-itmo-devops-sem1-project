@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,7 +25,7 @@ func main() {
 	go func() {
 		// Wait for a signal
 		sig := <-signalCh
-		log.Printf("Received signal: %+v", sig)
+		server.Log.Info(fmt.Sprintf("Received signal: %+v", sig))
 
 		// Perform graceful server shutdown
 		server.Shutdown(shutdownTimeout)

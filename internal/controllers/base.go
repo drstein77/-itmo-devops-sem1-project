@@ -15,7 +15,7 @@ import (
 
 // Storage interface for database operations
 type Storage interface {
-	ProcessPrices(io.Reader) (*models.ProcessResponse, error)
+	ProcessPrices(context.Context, io.Reader) (*models.ProcessResponse, error)
 	GetAllProducts(context.Context) ([]models.Product, error)
 }
 
@@ -61,7 +61,7 @@ func (h *BaseController) Route() *chi.Mux {
 }
 
 func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
-	response, err := h.storage.ProcessPrices(r.Body)
+	response, err := h.storage.ProcessPrices(h.ctx, r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to process prices: %v", err), http.StatusInternalServerError)
 		return

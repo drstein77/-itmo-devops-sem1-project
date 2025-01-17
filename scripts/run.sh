@@ -4,19 +4,11 @@ set -e
 
 echo "=== Запуск приложения ==="
 
-# Загрузка переменных окружения вручную
+# Загрузка переменных окружения 
 export RUN_ADDRESS=:8080
 export LOG_LEVEL=debug
 export DATABASE_URI=postgres://validator:val1dat0r@localhost:5432/project-sem-1?sslmode=disable
 echo "Переменные окружения загружены."
-
-# Установка зависимостей Go
-echo "Установка зависимостей Go..."
-go mod tidy
-
-# Компиляция приложения
-echo "Компиляция Go-приложения..."
-go build -o app cmd/priceanalyzer/main.go
 
 # Запуск приложения в фоновом режиме
 echo "Запуск приложения..."
@@ -44,5 +36,5 @@ for i in {1..30}; do
 
 done
 
-# Сохранение PID в файл для использования в других шагах, если необходимо
+# Сохранение PID в файл
 echo $APP_PID > app.pid

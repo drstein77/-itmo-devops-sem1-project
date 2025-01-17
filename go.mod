@@ -4,7 +4,6 @@ go 1.23.3
 
 require (
 	github.com/go-chi/chi v1.5.5
-	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/joho/godotenv v1.5.1
 	go.uber.org/zap v1.27.0

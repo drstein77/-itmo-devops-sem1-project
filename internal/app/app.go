@@ -5,8 +5,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/bdkeeper"
@@ -21,13 +19,12 @@ import (
 type Server struct {
 	srv *http.Server
 	ctx context.Context
+	Log *logger.Logger
 }
 
 // NewServer creates a new Server instance with the provided context
 func NewServer(ctx context.Context) *Server {
-	server := new(Server)
-	server.ctx = ctx
-	return server
+	return &Server{ctx: ctx}
 }
 
 // Serve starts the server and handles signal interruption for graceful shutdown
@@ -41,9 +38,10 @@ func (server *Server) Serve() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	server.Log = nLogger
 
 	// initialize the keeper instance
-	keeper := initializeKeeper(option.DataBaseDSN, nLogger)
+	keeper := initializeKeeper(server.ctx, option.DataBaseDSN, nLogger)
 	if keeper == nil {
 		nLogger.Debug("Failed to initialize keeper")
 	}
@@ -69,22 +67,20 @@ func (server *Server) Serve() {
 	// configure and start the server
 	server.srv = startServer(r, option.RunAddr())
 
-	// Create a channel to receive interrupt signals (e.g., CTRL+C)
-	stopChan := make(chan os.Signal, 1)
-	signal.Notify(stopChan, os.Interrupt)
-
-	// Block execution until a signal is received
-	<-stopChan
+	select {
+	case <-server.ctx.Done():
+		return
+	}
 }
 
 // initializeKeeper initializes a BDKeeper instance
-func initializeKeeper(dataBaseDSN func() string, logger *logger.Logger) *bdkeeper.BDKeeper {
+func initializeKeeper(ctx context.Context, dataBaseDSN func() string, logger *logger.Logger) *bdkeeper.BDKeeper {
 	if dataBaseDSN() == "" {
 		logger.Warn("DataBaseDSN is empty")
 		return nil
 	}
 
-	return bdkeeper.NewBDKeeper(dataBaseDSN, logger)
+	return bdkeeper.NewBDKeeper(ctx, dataBaseDSN, logger)
 }
 
 // initializeStorage initializes a MemoryStorage instance
@@ -143,7 +139,7 @@ func (server *Server) Shutdown(timeout time.Duration) {
 	ctxShutDown, cancel := context.WithTimeout(server.ctx, timeout)
 	defer cancel()
 
-	log.Println("attempting to stop the server")
+	server.Log.Info("attempting to stop the server")
 
 	if server.srv != nil {
 		if err := server.srv.Shutdown(ctxShutDown); err != nil {
@@ -152,8 +148,8 @@ func (server *Server) Shutdown(timeout time.Duration) {
 				return
 			}
 		}
-		log.Println("server stopped")
+		server.Log.Info("server stopped")
 	}
 
-	log.Println("server exited properly")
+	server.Log.Info("server exited properly")
 }
