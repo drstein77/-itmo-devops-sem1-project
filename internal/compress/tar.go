@@ -8,27 +8,27 @@ import (
 	"strings"
 )
 
-// TarReader реализует io.ReadCloser для чтения содержимого CSV файла из TAR архива.
+// TarReader implements io.ReadCloser for reading the content of a CSV file from a TAR archive.
 type TarReader struct {
 	current io.Reader
 	tr      *tar.Reader
 	eof     bool
 }
 
-// NewTarReader создает новый TarReader, извлекая первый найденный CSV файл из TAR архива.
+// NewTarReader creates a new TarReader, extracting the first found CSV file from the TAR archive.
 func NewTarReader(r io.ReadCloser) (*TarReader, error) {
 	defer r.Close()
 
-	// Читаем весь архив в буфер
+	// Read the entire archive into a buffer
 	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, r); err != nil {
 		return nil, err
 	}
 
-	// Создаем tar.Reader
+	// Create a tar.Reader
 	tr := tar.NewReader(bytes.NewReader(buf.Bytes()))
 
-	// Ищем первый CSV файл
+	// Search for the first CSV file
 	for {
 		header, err := tr.Next()
 		if err == io.EOF {
@@ -46,10 +46,10 @@ func NewTarReader(r io.ReadCloser) (*TarReader, error) {
 		}
 	}
 
-	return nil, errors.New("CSV файл не найден в TAR архиве")
+	return nil, errors.New("CSV file not found in the TAR archive")
 }
 
-// Read читает данные из текущего CSV файла.
+// Read reads data from the current CSV file.
 func (t *TarReader) Read(p []byte) (int, error) {
 	if t.eof {
 		return 0, io.EOF
@@ -61,7 +61,7 @@ func (t *TarReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-// Close завершает чтение.
+// Close finalizes the reading process.
 func (t *TarReader) Close() error {
-	return nil // Нет дополнительных ресурсов для закрытия
+	return nil // Required to satisfy the io.ReadCloser interface
 }

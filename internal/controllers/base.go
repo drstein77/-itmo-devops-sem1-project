@@ -68,7 +68,7 @@ func (h *BaseController) postPrices(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// Возвращаем результат клиенту
+	// Return the result to the client
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -80,10 +80,10 @@ func (h *BaseController) getPrices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Установка заголовка Content-Type
+	// Set the Content-Type header
 	w.Header().Set("Content-Type", "application/json")
 
-	// Кодирование данных в JSON и отправка ответа
+	// Encode the data to JSON and send the response
 	if err := json.NewEncoder(w).Encode(products); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}

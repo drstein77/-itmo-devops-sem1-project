@@ -48,46 +48,25 @@ func NewBDKeeper(ctx context.Context, dsn func() string, log Log) *BDKeeper {
 	}
 }
 
-func (kp *BDKeeper) Close() bool {
-	if kp.pool != nil {
-		kp.pool.Close()
-		kp.log.Info("Database connection pool closed")
-		return true
-	}
-	kp.log.Info("Attempted to close a nil database connection pool")
-	return false
-}
-
-func (kp *BDKeeper) Ping(ctx context.Context) bool {
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
-	defer cancel()
-
-	if err := kp.pool.Ping(ctx); err != nil {
-		return false
-	}
-
-	return true
-}
-
 func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Product) (err error) {
-	// Проверка подключения к базе
+	// Checking database connection
 	if kp.pool == nil {
 		return fmt.Errorf("database connection pool is nil")
 	}
 
-	// Начало транзакции
+	// Beginning transaction
 	tx, err := kp.pool.Begin(ctx)
 	if err != nil {
 		kp.log.Error("Failed to begin transaction", zap.Error(err))
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	// Используем deferred функцию для отката транзакции в случае ошибки
+	// Using deferred function to rollback transaction in case of an error
 	defer func() {
 		if err != nil {
 			rollbackErr := tx.Rollback(ctx)
 			if rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
-				// Логируем ошибку отката, но не переопределяем основную ошибку
+				// Logging rollback error without overriding the main error
 				kp.log.Error("Failed to rollback transaction", zap.Error(rollbackErr))
 			} else {
 				kp.log.Info("Transaction rolled back due to an error")
@@ -95,7 +74,7 @@ func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Produc
 		}
 	}()
 
-	// Подготовка запроса
+	// Preparing the query
 	stmt := `
         INSERT INTO prices (id, name, category, price, create_date)
         VALUES ($1, $2, $3, $4, $5)
@@ -103,30 +82,30 @@ func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Produc
     `
 	batch := &pgx.Batch{}
 
-	// Формирование пакета запросов
+	// Creating a batch of queries
 	for _, product := range products {
 		batch.Queue(stmt, product.ID, product.Name, product.Category, product.Price, product.CreatedAt)
 	}
 
-	// Выполнение пакета
+	// Executing the batch
 	br := tx.SendBatch(ctx, batch)
 
-	// Проверка ошибок выполнения запросов
+	// Checking for errors in query execution
 	for i := 0; i < len(products); i++ {
 		if _, execErr := br.Exec(); execErr != nil {
-			br.Close() // Закрываем батч перед возвратом ошибки
+			br.Close() // Closing the batch before returning an error
 			err = fmt.Errorf("failed to execute batch query: %w", execErr)
 			return err
 		}
 	}
 
-	// Закрываем батч после обработки всех запросов
+	// Closing the batch after processing all queries
 	if closeErr := br.Close(); closeErr != nil {
 		err = fmt.Errorf("failed to close batch results: %w", closeErr)
 		return err
 	}
 
-	// Коммит транзакции
+	// Committing the transaction
 	if commitErr := tx.Commit(ctx); commitErr != nil {
 		err = fmt.Errorf("failed to commit transaction: %w", commitErr)
 		return err
@@ -137,18 +116,18 @@ func (kp *BDKeeper) InsertProducts(ctx context.Context, products []models.Produc
 }
 
 func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	// Проверка подключения к базе
+	// Checking database connection
 	if kp.pool == nil {
 		return nil, fmt.Errorf("database connection pool is nil")
 	}
 
-	// SQL-запрос для извлечения всех данных из таблицы
+	// SQL query to fetch all data from the table
 	query := `
 		SELECT id, name, category, price, create_date
 		FROM prices
 	`
 
-	// Выполняем запрос
+	// Executing the query
 	rows, err := kp.pool.Query(ctx, query)
 	if err != nil {
 		kp.log.Error("Failed to execute query", zap.Error(err))
@@ -156,7 +135,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 	}
 	defer rows.Close()
 
-	// Считываем данные
+	// Reading data
 	var products []models.Product
 	for rows.Next() {
 		var product models.Product
@@ -174,7 +153,7 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 		products = append(products, product)
 	}
 
-	// Проверяем наличие ошибок при итерации
+	// Checking for errors during iteration
 	if rows.Err() != nil {
 		kp.log.Error("Error occurred during rows iteration", zap.Error(rows.Err()))
 		return nil, fmt.Errorf("error during rows iteration: %w", rows.Err())
@@ -182,4 +161,25 @@ func (kp *BDKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error
 
 	kp.log.Info("Successfully retrieved all products", zap.Int("count", len(products)))
 	return products, nil
+}
+
+func (kp *BDKeeper) Ping(ctx context.Context) bool {
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
+	defer cancel()
+
+	if err := kp.pool.Ping(ctx); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (kp *BDKeeper) Close() bool {
+	if kp.pool != nil {
+		kp.pool.Close()
+		kp.log.Info("Database connection pool closed")
+		return true
+	}
+	kp.log.Info("Attempted to close a nil database connection pool")
+	return false
 }

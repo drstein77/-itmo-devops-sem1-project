@@ -10,129 +10,128 @@ import (
 	"go.uber.org/zap"
 )
 
-// ArchiveTypeMiddleware — middleware для обработки ZIP и TAR архивов.
+// ArchiveTypeMiddleware is middleware for handling ZIP and TAR archives.
 func ArchiveTypeMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Получаем параметр archiveType из query строк
+		// Get the archiveType parameter from the query string
 		archiveType := r.URL.Query().Get("type")
 		if archiveType != "tar" && archiveType != "zip" {
 			archiveType = "zip"
 		}
 
-		// Применяем соответствующее сжатие
+		// Apply the appropriate compression handling
 		compressMiddleware := CreateCompressMiddleware(archiveType)
 		compressMiddleware(next).ServeHTTP(w, r)
 	})
 }
 
-// CreateCompressMiddleware создаёт middleware для обработки архива заданного типа.
+// CreateCompressMiddleware creates middleware to handle archives of the specified type.
 func CreateCompressMiddleware(archiveType string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Проверяем Content-Type
+			// Check Content-Type
 			if !strings.Contains(r.Header.Get("Content-Type"), "multipart/form-data") {
-				http.Error(w, "Content-Type должен быть multipart/form-data", http.StatusBadRequest)
+				http.Error(w, "Content-Type must be multipart/form-data", http.StatusBadRequest)
 				return
 			}
 
-			// Парсим multipart форму с ограничением памяти 32MB
+			// Parse the multipart form with a 32MB memory limit
 			err := r.ParseMultipartForm(32 << 20) // 32MB
 			if err != nil {
-				http.Error(w, "Не удалось разобрать multipart форму: "+err.Error(), http.StatusBadRequest)
+				http.Error(w, "Failed to parse multipart form: "+err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			// Получаем файл из формы
+			// Retrieve the file from the form
 			file, _, err := r.FormFile("file")
 			if err != nil {
-				http.Error(w, "Не удалось получить файл из формы: "+err.Error(), http.StatusBadRequest)
+				http.Error(w, "Failed to retrieve file from form: "+err.Error(), http.StatusBadRequest)
 				return
 			}
 			defer file.Close()
 
 			var extractedData io.ReadCloser
 
-			// В зависимости от типа архива используем соответствующий Reader
+			// Use the appropriate reader based on the archive type
 			switch archiveType {
 			case "zip":
 				extractedData, err = compress.NewZipReader(file)
 			case "tar":
 				extractedData, err = compress.NewTarReader(file)
 			default:
-				http.Error(w, "Неподдерживаемый тип архива", http.StatusBadRequest)
+				http.Error(w, "Unsupported archive type", http.StatusBadRequest)
 				return
 			}
 
 			if err != nil {
-				http.Error(w, "Ошибка при обработке архива: "+err.Error(), http.StatusBadRequest)
+				http.Error(w, "Error processing archive: "+err.Error(), http.StatusBadRequest)
 				return
 			}
 			defer extractedData.Close()
 
-			// Заменяем r.Body на распакованные данные CSV
+			// Replace r.Body with the unpacked CSV data
 			r.Body = extractedData
-			// Обновляем заголовок Content-Type на text/csv
+			// Update the Content-Type header to text/csv
 			r.Header.Set("Content-Type", "text/csv")
-			// Убираем Content-Length, так как он неизвестен после распаковки
+			// Remove Content-Length since it is unknown after unpacking
 			r.ContentLength = -1
 
-			// Передаём управление следующему обработчику
+			// Pass control to the next handler
 			next.ServeHTTP(w, r)
 		})
 	}
 }
 
-// CompressResponseMiddleware создает middleware для упаковки ответов в ZIP архив.
+// CompressResponseMiddleware creates middleware to compress responses into a ZIP archive.
 func CompressResponseMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		// Создаем буфер для захвата ответа
+		// Create a buffer to capture the response
 		var buf bytes.Buffer
-		// Используем ResponseWriter, который записывает в буфер
+		// Use a ResponseWriter that writes to the buffer
 		rr := &responseRecorder{
 			ResponseWriter: w,
 			body:           &buf,
 		}
 
-		// Вызываем следующий обработчик с нашим ResponseRecorder
+		// Call the next handler with the custom ResponseRecorder
 		next.ServeHTTP(rr, r)
 
-		// Получаем статус код и заголовки
+		// Get the status code and headers
 		statusCode := rr.statusCode
 		if statusCode == 0 {
 			statusCode = http.StatusOK
 		}
 
-		// Упаковываем данные в ZIP архив
+		// Package the data into a ZIP archive
 		var archiveBuffer bytes.Buffer
 		zw, err := compress.NewZipWriter(&archiveBuffer, "data.csv")
 		if err != nil {
 			zap.L().Error("Failed to create ZIP writer", zap.Error(err))
-			http.Error(w, "Ошибка при создании ZIP архива", http.StatusInternalServerError)
+			http.Error(w, "Error creating ZIP archive", http.StatusInternalServerError)
 			return
 		}
 
-		// Пишем данные в архив
+		// Write data into the archive
 		_, err = zw.Write(buf.Bytes())
 		if err != nil {
 			zap.L().Error("Failed to write to ZIP archive", zap.Error(err))
-			http.Error(w, "Ошибка при упаковке данных в ZIP архив", http.StatusInternalServerError)
+			http.Error(w, "Error packing data into ZIP archive", http.StatusInternalServerError)
 			return
 		}
 
-		// Закрываем архив
+		// Close the archive
 		if err := zw.Close(); err != nil {
 			zap.L().Error("Failed to close ZIP archive", zap.Error(err))
-			http.Error(w, "Ошибка при завершении ZIP архива", http.StatusInternalServerError)
+			http.Error(w, "Error finalizing ZIP archive", http.StatusInternalServerError)
 			return
 		}
 
-		// Устанавливаем заголовки
+		// Set headers
 		w.Header().Set("Content-Type", "application/zip")
 		w.Header().Set("Content-Disposition", `attachment; filename="data.zip"`)
 		w.WriteHeader(statusCode)
 
-		// Отправляем архив клиенту
+		// Send the archive to the client
 		_, err = w.Write(archiveBuffer.Bytes())
 		if err != nil {
 			zap.L().Error("Failed to write ZIP archive to response", zap.Error(err))
@@ -140,20 +139,20 @@ func CompressResponseMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// responseRecorder захватывает ответ для последующей упаковки в архив.
+// responseRecorder captures the response for later packaging into an archive.
 type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
 	body       *bytes.Buffer
 }
 
-// WriteHeader записывает статус код.
+// WriteHeader records the status code.
 func (rr *responseRecorder) WriteHeader(code int) {
 	rr.statusCode = code
-	// Не записываем сразу, чтобы дождаться упаковки данных
+	// Do not write immediately, wait until data is packed
 }
 
-// Write записывает данные в буфер.
+// Write writes data to the buffer.
 func (rr *responseRecorder) Write(b []byte) (int, error) {
 	return rr.body.Write(b)
 }

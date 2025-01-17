@@ -8,28 +8,28 @@ import (
 	"strings"
 )
 
-// ZipReader реализует io.ReadCloser для чтения содержимого CSV файла из ZIP архива.
+// ZipReader implements io.ReadCloser for reading the content of a CSV file from a ZIP archive.
 type ZipReader struct {
 	current io.ReadCloser
 }
 
-// NewZipReader создает новый ZipReader, извлекая первый найденный CSV файл из ZIP архива.
+// NewZipReader creates a new ZipReader, extracting the first found CSV file from the ZIP archive.
 func NewZipReader(r io.ReadCloser) (*ZipReader, error) {
 	defer r.Close()
 
-	// Читаем весь архив в буфер
+	// Read the entire archive into a buffer
 	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, r); err != nil {
 		return nil, err
 	}
 
-	// Создаем zip.Reader
+	// Create a zip.Reader
 	zr, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
 	if err != nil {
 		return nil, err
 	}
 
-	// Ищем первый CSV файл
+	// Search for the first CSV file
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
 			continue
@@ -43,26 +43,26 @@ func NewZipReader(r io.ReadCloser) (*ZipReader, error) {
 		}
 	}
 
-	return nil, errors.New("CSV файл не найден в ZIP архиве")
+	return nil, errors.New("CSV file not found in the ZIP archive")
 }
 
-// Read читает данные из текущего CSV файла.
+// Read reads data from the current CSV file.
 func (z *ZipReader) Read(p []byte) (int, error) {
 	return z.current.Read(p)
 }
 
-// Close закрывает текущий CSV файл.
+// Close closes the current CSV file.
 func (z *ZipReader) Close() error {
 	return z.current.Close()
 }
 
-// ZipWriter реализует упаковку данных в ZIP архив.
+// ZipWriter implements packaging data into a ZIP archive.
 type ZipWriter struct {
 	zipWriter *zip.Writer
 	file      io.Writer
 }
 
-// NewZipWriter создает новый ZipWriter с указанным именем файла внутри архива.
+// NewZipWriter creates a new ZipWriter with the specified file name inside the archive.
 func NewZipWriter(w io.Writer, fileName string) (*ZipWriter, error) {
 	zw := zip.NewWriter(w)
 	f, err := zw.Create(fileName)
@@ -75,12 +75,12 @@ func NewZipWriter(w io.Writer, fileName string) (*ZipWriter, error) {
 	}, nil
 }
 
-// Write записывает данные в файл внутри ZIP архива.
+// Write writes data to a file inside the ZIP archive.
 func (z *ZipWriter) Write(p []byte) (int, error) {
 	return z.file.Write(p)
 }
 
-// Close закрывает ZIP архив.
+// Close closes the ZIP archive.
 func (z *ZipWriter) Close() error {
 	return z.zipWriter.Close()
 }

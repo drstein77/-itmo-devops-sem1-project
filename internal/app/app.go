@@ -75,21 +75,11 @@ func (server *Server) Serve() {
 
 // initializeKeeper initializes a BDKeeper instance
 func initializeKeeper(ctx context.Context, dataBaseDSN func() string, logger *logger.Logger) *bdkeeper.BDKeeper {
-	if dataBaseDSN() == "" {
-		logger.Warn("DataBaseDSN is empty")
-		return nil
-	}
-
 	return bdkeeper.NewBDKeeper(ctx, dataBaseDSN, logger)
 }
 
 // initializeStorage initializes a MemoryStorage instance
 func initializeStorage(ctx context.Context, keeper storage.Keeper, logger *logger.Logger) *storage.MemoryStorage {
-	if keeper == nil {
-		logger.Warn("Keeper is nil, cannot initialize storage")
-		return nil
-	}
-
 	return storage.NewMemoryStorage(ctx, keeper, logger)
 }
 
@@ -150,6 +140,5 @@ func (server *Server) Shutdown(timeout time.Duration) {
 		}
 		server.Log.Info("server stopped")
 	}
-
 	server.Log.Info("server exited properly")
 }

@@ -20,11 +20,13 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
+// Log defines an interface for logging.
 type Log interface {
 	Info(string, ...zap.Field)
+	Error(string, ...zap.Field)
 }
 
-// MemoryStorage represents an in-memory storage with locking mechanisms
+// MemoryStorage represents an in-memory storage with locking mechanisms.
 type MemoryStorage struct {
 	ctx context.Context
 	mx  sync.RWMutex
@@ -33,7 +35,7 @@ type MemoryStorage struct {
 	log    Log
 }
 
-// Keeper interface for database operations
+// Keeper is an interface for database operations.
 type Keeper interface {
 	GetAllProducts(context.Context) ([]models.Product, error)
 	InsertProducts(context.Context, []models.Product) error
@@ -41,8 +43,13 @@ type Keeper interface {
 	Close() bool
 }
 
-// NewMemoryStorage creates a new MemoryStorage instance
+// NewMemoryStorage creates a new MemoryStorage instance.
 func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorage {
+	if keeper == nil {
+		log.Error("keeper is nil, cannot initialize storage")
+		return nil
+	}
+
 	return &MemoryStorage{
 		ctx: ctx,
 
@@ -51,9 +58,9 @@ func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorag
 	}
 }
 
-// GetAllProducts извлекает все продукты через bdKeeper
+// GetAllProducts retrieves all products via bdKeeper.
 func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	// Вызываем метод GetAllProducts на уровне BDKeeper
+	// Call the GetAllProducts method at the BDKeeper level
 	products, err := s.keeper.GetAllProducts(ctx)
 	if err != nil {
 		return nil, err
@@ -63,25 +70,25 @@ func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, e
 }
 
 func (s *MemoryStorage) ProcessPrices(ctx context.Context, data io.Reader) (*models.ProcessResponse, error) {
-	// Чтение CSV-данных
+	// Read CSV data
 	products, err := s.parseCSV(data)
 	if err != nil {
 		return nil, err
 	}
 
-	// Сохранение данных в базе
+	// Save data to the database
 	if err := s.keeper.InsertProducts(ctx, products); err != nil {
 		return nil, err
 	}
 
-	// Сбор статистики
+	// Collect statistics
 	return s.calculateStats(products), nil
 }
 
 func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
 	csvReader := csv.NewReader(bufio.NewReader(data))
 
-	// Пропускаем заголовок CSV
+	// Skip the CSV header
 	_, err := csvReader.Read()
 	if err != nil {
 		return nil, errors.New("failed to read CSV header")
@@ -97,7 +104,7 @@ func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
 			return nil, errors.New("failed to read CSV")
 		}
 
-		// Преобразуем строку в структуру
+		// Convert the string to a structure
 		id, _ := strconv.Atoi(record[0])
 		price, _ := strconv.ParseFloat(record[3], 64)
 
