@@ -10,11 +10,14 @@ PG_DB=project-sem-1
 
 echo "=== Запуск приложения ==="
 
-# Загрузка переменных окружения 
-export RUN_ADDRESS=:8080
-export LOG_LEVEL=debug 
-export DATABASE_URI=postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable
+# Проверяем, что бинарник существует
+if [ ! -f "./app" ]; then
+    echo "Ошибка: бинарный файл ./app не найден! Возможно, не был скомпилирован."
+    exit 1
+fi
 
+# Загрузка переменных окружения 
+export DATABASE_URI=postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable
 echo "Переменные окружения загружены."
 
 # Запуск приложения в фоновом режиме
@@ -27,7 +30,8 @@ APP_PID=$!
 # Ожидание, пока приложение не станет доступным
 echo "Ожидание запуска приложения на порту 8080..."
 for i in {1..30}; do
-    if curl -s http://localhost:8080/health > /dev/null; then
+    # --head (HEAD-запрос) вернёт заголовки; если сервер не ответит, grep не найдёт 'HTTP/'.
+    if curl -s --head http://localhost:8080 | grep "HTTP/" > /dev/null; then
         echo "Приложение запущено и доступно."
         break
     else
@@ -40,7 +44,6 @@ for i in {1..30}; do
         kill $APP_PID
         exit 1
     fi
-
 done
 
 # Сохранение PID в файл

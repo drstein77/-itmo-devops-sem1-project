@@ -17,6 +17,12 @@ if ! command -v migrate &> /dev/null; then
     exit 1
 fi
 
+# Проверяем наличие каталога migrations
+if [ ! -d "migrations" ]; then
+    echo "Ошибка: каталог migrations не найден!"
+    exit 1
+fi
+
 # Запуск миграции
 echo "Запуск миграции..." 
 migrate -path=migrations -database "postgres://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${PG_DB}?sslmode=disable" up
