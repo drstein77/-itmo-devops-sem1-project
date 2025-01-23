@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/drstein77/priceanalyzer/internal/models"
@@ -30,7 +29,6 @@ type Log interface {
 // MemoryStorage represents an in-memory storage with locking mechanisms.
 type MemoryStorage struct {
 	ctx context.Context
-	mx  sync.RWMutex
 
 	keeper Keeper
 	log    Log
@@ -39,7 +37,7 @@ type MemoryStorage struct {
 // Keeper is an interface for database operations.
 type Keeper interface {
 	GetAllProducts(context.Context) ([]models.Product, error)
-	InsertProducts(context.Context, []models.Product) error
+	InsertProducts(context.Context, []models.Product) (*models.ProcessResponse, error)
 	Ping(context.Context) bool
 	Close() bool
 }
@@ -61,8 +59,6 @@ func NewMemoryStorage(ctx context.Context, keeper Keeper, log Log) *MemoryStorag
 
 // GetAllProducts retrieves all products via dbKeeper.
 func (s *MemoryStorage) GetAllProducts(ctx context.Context) ([]models.Product, error) {
-	s.mx.RLock()
-	defer s.mx.RUnlock()
 
 	// Call the GetAllProducts method at the DBKeeper level
 	products, err := s.keeper.GetAllProducts(ctx)
@@ -79,16 +75,12 @@ func (s *MemoryStorage) ProcessPrices(ctx context.Context, data io.Reader) (*mod
 		return nil, err
 	}
 
-	s.mx.Lock()
-	defer s.mx.Unlock()
-
-	// Save data to the database
-	if err := s.keeper.InsertProducts(ctx, products); err != nil {
+	response, err := s.keeper.InsertProducts(ctx, products)
+	if err != nil {
 		return nil, err
 	}
 
-	// Collect statistics
-	return s.calculateStats(products), nil
+	return response, nil
 }
 
 func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
@@ -142,21 +134,4 @@ func (s *MemoryStorage) parseCSV(data io.Reader) ([]models.Product, error) {
 		})
 	}
 	return products, nil
-}
-
-func (s *MemoryStorage) calculateStats(products []models.Product) *models.ProcessResponse {
-	totalItems := len(products)
-	totalPrice := 0.0
-	categories := make(map[string]bool)
-
-	for _, product := range products {
-		totalPrice += product.Price
-		categories[product.Category] = true
-	}
-
-	return &models.ProcessResponse{
-		TotalItems:      totalItems,
-		TotalCategories: len(categories),
-		TotalPrice:      totalPrice,
-	}
 }

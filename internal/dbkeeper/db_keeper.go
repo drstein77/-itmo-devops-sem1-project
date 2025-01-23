@@ -2,6 +2,7 @@ package dbkeeper
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -48,71 +49,72 @@ func NewDBKeeper(ctx context.Context, dsn func() string, log Log) *DBKeeper {
 	}
 }
 
-func (kp *DBKeeper) InsertProducts(ctx context.Context, products []models.Product) (err error) {
-	// Checking database connection
-	if kp.pool == nil {
-		return fmt.Errorf("database connection pool is nil")
+func (kp *DBKeeper) InsertProducts(ctx context.Context, products []models.Product) (*models.ProcessResponse, error) {
+	if len(products) == 0 {
+		return &models.ProcessResponse{}, nil
 	}
 
-	// Beginning transaction
+	if kp.pool == nil {
+		return nil, fmt.Errorf("database connection pool is nil")
+	}
+
 	tx, err := kp.pool.Begin(ctx)
 	if err != nil {
 		kp.log.Error("Failed to begin transaction", zap.Error(err))
-		return fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-
-	// Using deferred function to rollback transaction in case of an error
 	defer func() {
 		if err != nil {
-			rollbackErr := tx.Rollback(ctx)
-			if rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
-				// Logging rollback error without overriding the main error
+			if rollbackErr := tx.Rollback(ctx); rollbackErr != nil && rollbackErr != pgx.ErrTxClosed {
 				kp.log.Error("Failed to rollback transaction", zap.Error(rollbackErr))
-			} else {
-				kp.log.Info("Transaction rolled back due to an error")
 			}
 		}
 	}()
 
-	// Preparing the query
-	stmt := `
-        INSERT INTO prices (id, name, category, price, create_date)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (id) DO NOTHING
-    `
+	stmt := `INSERT INTO prices (name, category, price, create_date) VALUES ($1, $2, $3, $4)`
 	batch := &pgx.Batch{}
-
-	// Creating a batch of queries
 	for _, product := range products {
-		batch.Queue(stmt, product.ID, product.Name, product.Category, product.Price, product.CreatedAt)
+		batch.Queue(stmt, product.Name, product.Category, product.Price, product.CreatedAt)
 	}
 
-	// Executing the batch
 	br := tx.SendBatch(ctx, batch)
 
-	// Checking for errors in query execution
-	for i := 0; i < len(products); i++ {
+	for range products {
 		if _, execErr := br.Exec(); execErr != nil {
-			br.Close() // Closing the batch before returning an error
 			err = fmt.Errorf("failed to execute batch query: %w", execErr)
-			return err
+			return nil, err
 		}
 	}
 
-	// Closing the batch after processing all queries
 	if closeErr := br.Close(); closeErr != nil {
-		err = fmt.Errorf("failed to close batch results: %w", closeErr)
-		return err
+		kp.log.Error("Failed to close batch", zap.Error(closeErr))
 	}
 
-	// Committing the transaction
+	var resp models.ProcessResponse
+	statsCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	row := tx.QueryRow(statsCtx, `
+		SELECT COUNT(*), COUNT(DISTINCT category), COALESCE(SUM(price), 0)
+		FROM prices
+	`)
+
+	if scanErr := row.Scan(&resp.TotalItems, &resp.TotalCategories, &resp.TotalPrice); scanErr != nil {
+		if errors.Is(scanErr, pgx.ErrNoRows) {
+			return &models.ProcessResponse{}, nil
+		}
+		err = fmt.Errorf("failed to calculate stats: %w", scanErr)
+		return nil, err
+	}
+
+	kp.log.Info("Committing transaction...")
 	if commitErr := tx.Commit(ctx); commitErr != nil {
 		err = fmt.Errorf("failed to commit transaction: %w", commitErr)
-		return err
+		return nil, err
 	}
 
-	kp.log.Info("Products successfully inserted into the database")
-	return nil
+	kp.log.Info("Products successfully inserted, stats calculated.")
+	return &resp, nil
 }
 
 func (kp *DBKeeper) GetAllProducts(ctx context.Context) ([]models.Product, error) {

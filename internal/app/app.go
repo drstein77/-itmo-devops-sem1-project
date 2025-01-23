@@ -93,17 +93,19 @@ func initializeBaseController(ctx context.Context, storage *storage.MemoryStorag
 // startServer configures and starts an HTTP server with the provided router and address
 func startServer(router chi.Router, address string) *http.Server {
 	const (
-		oneMegabyte = 1 << 20
-		readTimeout = 3 * time.Second
+		// The default size limit for headers in Golang (see DefaultMaxHeaderBytes) has
+		// been explicitly defined for clarity.
+		oneMegabyte    = 1 << 20
+		defaultTimeout = 30 * time.Second
 	)
 
 	server := &http.Server{
 		Addr:                         address,
 		Handler:                      router,
-		ReadHeaderTimeout:            readTimeout,
-		WriteTimeout:                 readTimeout,
-		IdleTimeout:                  readTimeout,
-		ReadTimeout:                  readTimeout,
+		ReadHeaderTimeout:            defaultTimeout,
+		WriteTimeout:                 defaultTimeout,
+		IdleTimeout:                  defaultTimeout,
+		ReadTimeout:                  defaultTimeout,
 		MaxHeaderBytes:               oneMegabyte, // 1 MB
 		DisableGeneralOptionsHandler: false,
 		TLSConfig:                    nil,
